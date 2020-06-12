@@ -2,7 +2,7 @@
 //  ManualScrollView.swift
 //  ScrollViewAlbum
 //
-//  Created by Monph on 2020/6/11.
+//  Created by  on 2020/6/11.
 //  Copyright © 2020 Holo. All rights reserved.
 //
 
@@ -23,45 +23,56 @@ class ManualScrollView: UIView,UIScrollViewDelegate {
     var imageType:SourceType = .Local
     var currentIndex:Int = 0
     var scrollView = UIScrollView(frame: .zero)
-    var pageControl = UIPageControl(frame: .zero)
+    public var pageControl = UIPageControl(frame: .zero)
     weak var delegate:ManualScrollViewDelegate?
     private var imageCount = 0
     private var imageViewList = [UIImageView]()
     /*
-     1、获取图片资源的时候、创建每个UIImageView,不够三张、通过逻辑补齐、实现三张复用的现象
+     1、获取图片资源的时候、创建三张复用的UIImageView,不够三张、通过逻辑补齐
      2、imageView.tag 作为每张图片的索引、
-     3、未滑动时、第一张记录的是最后一张图片的index
-     4、滑动后修改所有imageView的tag和图片、currentIndex的取值根据第一个元素
-     5、每次滚动后、contentOffset偏移量为 一个视图宽度、所以当前显示的currentIndex取数组中的第一个元素值。
+     3、未滑动时、imageViewList[0]记录的是0
+     4、滑动后修改复用的三张imageView的tag和图片、
+     5、每次滚动后、scrollView.contentOffset设置为偏移一个视图宽度、所以currentIndex的取值为imageViewList[1]
+     6、因为属性isPagingEnabled = true、按页翻动、所以offset.x是视图的整数倍，0 或者 2 * width
      */
     var imageNameArr:[String] = [String](){
         didSet{
             imageCount = imageNameArr.count
             let s_width = frame.size.width
             let s_height = frame.size.height
+            //不够三张、补齐三张
             if imageCount < 3 {
-                while imageNameArr.count<3 {
+                while imageNameArr.count < 3 {
                     imageNameArr.append(imageNameArr.first ?? "")
                 }
             }
-            for i in 0..<imageNameArr.count {
+            for i in 0..<3 {
                 let imageView = UIImageView()
                 let imageName:String = imageNameArr[i]
                 imageView.frame = CGRect(x: CGFloat(i) * self.frame.size.width, y: 0, width: s_width, height: s_height)
                 scrollView.addSubview(imageView)
                 //tag作为当前图片索引、随时可变
-                imageView.tag  =  (i - 1 + imageCount)%imageNameArr.count
-                // count==2 时特殊处理
-                if imageCount == 2 && i == 2 {
-                    imageView.tag = -1
-                }
+                imageView.tag  =  i % imageCount
+                // count==2 时特殊处理、使其变为第一张的标记
+                if imageCount == 2 && i == 2 {imageView.tag = 0}
                 self.setImageToView(imageView: imageView, imageName: imageName)
                 imageViewList.append(imageView)
             }
             pageControl.numberOfPages = imageCount
+            //初始化tag值、默认使其右滑了一次、便于理解了
+            self.reuseImages()
         }
     }
 
+//MARK: private test button
+    var leftBtn = UIButton(type: .custom)
+    var rightBtn = UIButton(type: .custom)
+    var isTestHidden:Bool = true{
+        didSet{
+            leftBtn.isHidden = isTestHidden
+            rightBtn.isHidden = isTestHidden
+        }
+    }
     override init(frame: CGRect) {
         super.init(frame: frame)
         self.addSubview(scrollView)
@@ -76,12 +87,38 @@ class ManualScrollView: UIView,UIScrollViewDelegate {
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.contentSize = CGSize(width: 3 * s_width, height: s_height)
 
+
         pageControl.frame = CGRect(x: 50, y: s_height - 50, width: s_width - 100, height: 30)
         pageControl.currentPage = 0
         pageControl.pageIndicatorTintColor = .gray
         pageControl.currentPageIndicatorTintColor = .red
-//        pageControl.backgroundColor = .white
         pageControl.addTarget(self, action: #selector(pageControlChanged), for: .valueChanged)
+
+        self.addSubview(leftBtn)
+        self.addSubview(rightBtn)
+        leftBtn.frame = CGRect(x: 0, y: self.frame.size.height/2.0-30, width: 60, height: 60)
+        leftBtn.setTitle("Left", for: .normal)
+        leftBtn.setTitleColor(.cyan, for: .normal)
+        leftBtn.titleLabel?.font = UIFont.systemFont(ofSize: 20)
+        leftBtn.tag = 100000
+        leftBtn.addTarget(self, action: #selector(buttonAction(sender:)), for: .touchUpInside)
+
+        rightBtn.frame = CGRect(x: self.frame.size.width-60, y: self.frame.size.height/2.0-30, width: 60, height: 60)
+        rightBtn.setTitle("Right", for: .normal)
+        rightBtn.setTitleColor(.cyan, for: .normal)
+        rightBtn.titleLabel?.font = UIFont.systemFont(ofSize: 20)
+        rightBtn.tag = 100001
+        rightBtn.addTarget(self, action: #selector(buttonAction(sender:)), for: .touchUpInside)
+
+    }
+
+    @objc func buttonAction(sender:UIButton){
+        let index = sender.tag
+        if index == 100000 {
+            scrollView.setContentOffset(.zero, animated: true)
+        }else{
+            scrollView.setContentOffset(CGPoint(x: 2 * self.frame.size.width, y: 0), animated: true)
+        }
     }
 
     @objc func pageControlChanged(){
@@ -99,23 +136,26 @@ class ManualScrollView: UIView,UIScrollViewDelegate {
         if self.delegate != nil {
             self.delegate?.didSelectImageAction(index: pageControl.currentPage)
         }
+
     }
 
 
     func reuseImages(){
         var flag = 0
         let offset:CGPoint = scrollView.contentOffset
+        //往左滑动、
         if (offset.x == 2 * self.frame.size.width)  {flag = 1}
+        //往右滑动
         else if (offset.x == 0)                     {flag = -1 }
+        //滑动失败
         else                                        {return }
-        //修改所有imageView的tag、1位置的currentIndex随着改变
+        //修改三张 imageView的tag、1位置的currentIndex表示当前index
         imageViewList.forEach { (tempImgView:UIImageView) in
             //计算每个ImagView的轮询索引
             let index = tempImgView.tag+flag+imageCount
             tempImgView.tag = index%imageCount
             let imageName:String = imageNameArr[tempImgView.tag]
             self.setImageToView(imageView: tempImgView, imageName: imageName)
-            print("imageView.tag = %d",tempImgView.tag)
         }
         scrollView.contentOffset = CGPoint(x: self.frame.size.width, y: 0)
         pageControl.currentPage = imageViewList[1].tag

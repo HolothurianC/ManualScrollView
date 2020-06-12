@@ -2,7 +2,7 @@
 //  ViewController.swift
 //  ScrollViewAlbum
 //
-//  Created by Monph on 2020/6/10.
+//  Created by  on 2020/6/10.
 //  Copyright © 2020 Holo. All rights reserved.
 //
 
@@ -33,6 +33,7 @@ class ViewController: UIViewController,ManualScrollViewDelegate{
         //self.createMainView()
 
         manualScrollView.delegate = self
+        manualScrollView.isTestHidden = false
 #if  true
         //本地图片
         manualScrollView.imageType = .Local

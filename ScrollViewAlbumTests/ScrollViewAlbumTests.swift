@@ -2,7 +2,7 @@
 //  ScrollViewAlbumTests.swift
 //  ScrollViewAlbumTests
 //
-//  Created by Monph on 2020/6/10.
+//  Created by  on 2020/6/10.
 //  Copyright © 2020 Holo. All rights reserved.
 //
 
